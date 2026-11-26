@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 5,
+  "rules": [
+    {
+      "name": "Less politics",
+      "conditions": [
+        {
+          "type": "titleContains",
+          "value": "/\\b(?:Trump|Putin|Zelenskyy?|Iran(?:ian)?|Israeli?|war)\\b|Ukrain.*Russia|Russia.*Ukrain/i"
+        }
+      ],
+      "action": "hide"
+    }
+  ]
+}

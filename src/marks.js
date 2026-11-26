@@ -1,11 +1,13 @@
 // How matched cards look: page CSS for blur and hide, Reveal buttons, and counts.
-/** @import { Mode } from './typedefs.js' */
+/** @import { Action, Mode } from './typedefs.js' */
 import { BLUR_PIXELS, REVEAL_ON_HOVER, UI_ATTRIBUTE } from './constants.js';
 
 const MATCH = 'ytuw-match';
+const ACTION = 'data-ytuw-action';
 const REVEALED = 'data-ytuw-revealed';
 const MODE = 'data-ytuw-mode';
-const BLURRED = `html[${MODE}="blur"] .${MATCH}`;
+const ACTIVE = `html[${MODE}="on"] .${MATCH}`;
+const BLURRED = `${ACTIVE}[${ACTION}="blur"]`;
 const CONTENT = `:not([${UI_ATTRIBUTE}])`;
 
 // Same specificity as the blur rule, so it must come after it.
@@ -20,7 +22,7 @@ const HOVER_CSS = `
 
 export const PAGE_CSS = `
   .${MATCH} { position: relative !important; }
-  html[${MODE}="hide"] .${MATCH} { display: none !important; }
+  ${ACTIVE}[${ACTION}="hide"] { display: none !important; }
   ${BLURRED}:not([${REVEALED}]) > ${CONTENT} {
     filter: blur(${BLUR_PIXELS}px) !important;
     opacity: 0.18 !important;
@@ -48,20 +50,21 @@ export const PAGE_CSS = `
   .ytuw-reveal:focus-visible { outline: 3px solid #80c7ff !important; }
 `;
 
-/** Switches the page CSS between blur, hide and off. */
+/** Turns the page CSS on or off. */
 export function showMode(document, mode) {
   document.documentElement.setAttribute(MODE, mode);
 }
 
 /**
- * Marks matched cards, each with a Reveal button.
+ * Marks matched cards with their action, each with a Reveal button for blur.
  * A reveal lasts until YouTube reuses the card for another video.
  */
 export function createMarks(onToggle) {
   /** @type {Map<Element, { fingerprint: string, button: HTMLButtonElement }>} */
   const marked = new Map();
 
-  function mark(card, fingerprint) {
+  /** @param {Action} action */
+  function mark(card, fingerprint, action) {
     let state = marked.get(card);
     if (state?.fingerprint !== fingerprint) {
       unmark(card);
@@ -71,10 +74,12 @@ export function createMarks(onToggle) {
     // YouTube may replace a card's children during navigation.
     if (state.button.parentElement !== card) card.append(state.button);
     card.classList.add(MATCH);
+    card.setAttribute(ACTION, action);
   }
 
   function unmark(card) {
     card.classList.remove(MATCH);
+    card.removeAttribute(ACTION);
     card.removeAttribute(REVEALED);
     marked.get(card)?.button.remove();
     marked.delete(card);
@@ -92,8 +97,9 @@ export function createMarks(onToggle) {
     /** Cards blurred or hidden right now. @param {Mode} mode */
     filteredCount(mode) {
       if (mode === 'off') return 0;
-      if (mode === 'hide') return marked.size;
-      return [...marked.keys()].filter((card) => !card.hasAttribute(REVEALED)).length;
+      return [...marked.keys()].filter(
+        (card) => card.getAttribute(ACTION) === 'hide' || !card.hasAttribute(REVEALED),
+      ).length;
     },
   };
 }

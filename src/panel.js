@@ -1,15 +1,12 @@
 // Always-visible controls: the side tab with its count, and the mode and Filters bar.
 /** @import { Mode } from './typedefs.js' */
-import { DEFAULT_MODE, MODES, REVEAL_ON_HOVER, UI_ATTRIBUTE } from './constants.js';
+import { DEFAULT_MODE, MODES, UI_ATTRIBUTE } from './constants.js';
 
 export const HOST_ID = 'ytuw-controls';
 
 const MODE_TITLES = {
-  blur: REVEAL_ON_HOVER
-    ? 'Blur matches; hover or click Reveal to see one'
-    : 'Blur matches; click Reveal to see one',
-  hide: 'Remove all matching cards',
-  off: 'Show all videos normally',
+  on: 'Blur or hide matching videos, as each rule says',
+  off: 'Show all videos normally. Your rules stay saved.',
 };
 
 const PANEL_CSS = `
@@ -80,7 +77,7 @@ export function createPanel(document, { editor, onMode }) {
     }),
   );
   const filtersButton = button('Filters', () => editor.open());
-  filtersButton.title = 'Edit saved title, channel, and view-count settings or back them up';
+  filtersButton.title = 'Edit, import or export your rules';
   filtersButton.setAttribute('aria-haspopup', 'dialog');
   bar.append(count, ...modeButtons.values(), filtersButton);
 

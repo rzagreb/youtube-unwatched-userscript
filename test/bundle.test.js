@@ -56,30 +56,39 @@ async function until(condition, timeoutMs = 2000) {
   }
 }
 
-test('the built script marks matching cards and remembers the chosen mode', (t) => {
-  const page = runOnHome({
-    filters: {
-      schemaVersion: 4,
-      titles: ['crash'],
-      channels: [],
-      applyToSubscribed: { titles: true },
-    },
-  });
+/** Saved settings with one rule that blurs titles containing "crash". */
+function crashRule(...more) {
+  const conditions = [{ type: 'titleContains', value: 'crash' }, ...more];
+  return { schemaVersion: 5, rules: [{ name: 'No crashes', conditions, action: 'blur' }] };
+}
+
+/** The controls' shadow root and a lookup for its buttons by text. */
+function controls(page) {
+  const shadow = page.document.getElementById('ytuw-controls').shadowRoot;
+  const button = (text) =>
+    [...shadow.querySelectorAll('button')].find((item) => item.textContent === text);
+  return { shadow, button };
+}
+
+test('the built script marks matching cards and remembers On or Off', (t) => {
+  const page = runOnHome({ filters: crashRule() });
   t.after(() => page.window.close());
 
   assert.ok(page.crash.classList.contains('ytuw-match'));
+  assert.equal(page.crash.getAttribute('data-ytuw-action'), 'blur');
   assert.ok(page.crash.querySelector('button.ytuw-reveal'));
   assert.equal(page.weather.classList.contains('ytuw-match'), false);
-  const shadow = page.document.getElementById('ytuw-controls').shadowRoot;
+  const { shadow } = controls(page);
   assert.equal(shadow.querySelector('.side-tab').textContent, '1');
 
-  shadow.querySelector('button[data-mode="hide"]').click();
-  assert.equal(page.document.documentElement.getAttribute('data-ytuw-mode'), 'hide');
-  assert.equal(page.values.get('mode'), 'hide');
+  shadow.querySelector('button[data-mode="off"]').click();
+  assert.equal(page.document.documentElement.getAttribute('data-ytuw-mode'), 'off');
+  assert.equal(page.values.get('mode'), 'off');
+  assert.equal(shadow.querySelector('.side-tab').textContent, '0');
 });
 
-test('filters that exempt subscriptions wait for the check, then apply when signed out', async (t) => {
-  const page = runOnHome({ filters: { schemaVersion: 4, titles: ['crash'], channels: [] } });
+test('rules with a subscription condition wait for the check, then apply when signed out', async (t) => {
+  const page = runOnHome({ filters: crashRule({ type: 'notSubscribed', value: null }) });
   t.after(() => page.window.close());
 
   assert.equal(page.crash.classList.contains('ytuw-match'), false, 'paused while unknown');
@@ -96,42 +105,83 @@ test('a first run saves the defaults and shows the controls with nothing marked'
   assert.equal(page.document.querySelectorAll('.ytuw-match').length, 0);
 });
 
-test('saving the Filters editor stores the rules and applies them to the page', async (t) => {
+test('a new rule from the editor is saved and applied to the page', async (t) => {
   const page = runOnHome({});
   t.after(() => page.window.close());
-  const shadow = page.document.getElementById('ytuw-controls').shadowRoot;
-  const button = (text) =>
-    [...shadow.querySelectorAll('button')].find((item) => item.textContent === text);
+  const { shadow, button } = controls(page);
 
   button('Filters').click();
   const dialog = shadow.querySelector('dialog');
   assert.equal(dialog.open, true);
-  shadow.getElementById('ytuw-titles').value = 'weather\n\n';
-  shadow.getElementById('ytuw-subscribed-titles').checked = true;
+  button('+ Add rule').click();
+  assert.equal(shadow.activeElement, shadow.querySelector('.rule-head input'));
+  shadow.querySelector('.condition input').value = ' weather ';
   button('Save').click();
 
   assert.equal(dialog.open, false);
-  assert.equal(JSON.stringify(page.values.get('filters').titles), '["weather"]');
+  const expected = [
+    { name: 'Rule 1', conditions: [{ type: 'titleContains', value: 'weather' }], action: 'blur' },
+  ];
+  assert.equal(JSON.stringify(page.values.get('filters').rules), JSON.stringify(expected));
   await until(() => page.weather.classList.contains('ytuw-match'));
   assert.equal(page.crash.classList.contains('ytuw-match'), false);
 });
 
+test('a save error names the field and keeps every input', (t) => {
+  const page = runOnHome({ filters: crashRule() });
+  t.after(() => page.window.close());
+  const { shadow, button } = controls(page);
+
+  button('Filters').click();
+  const value = shadow.querySelector('.condition input');
+  value.value = '';
+  button('Save').click();
+
+  assert.equal(shadow.querySelector('dialog').open, true);
+  assert.match(
+    shadow.querySelector('.status').textContent,
+    /Rule "No crashes", condition 1: enter some text/,
+  );
+  assert.equal(value.getAttribute('aria-invalid'), 'true');
+  assert.equal(shadow.activeElement, value);
+  assert.equal(shadow.querySelector('.rule-head input').value, 'No crashes');
+});
+
+test('importing a rule whose name is taken asks first, and Keep mine skips it', async (t) => {
+  const page = runOnHome({ filters: crashRule() });
+  t.after(() => page.window.close());
+  const { shadow, button } = controls(page);
+  const incoming = crashRule().rules.map((rule) => ({ ...rule, action: 'hide' }));
+  incoming.push({ name: 'Weather', conditions: [{ type: 'viewsMissing' }], action: 'blur' });
+  const file = new page.window.File(
+    [JSON.stringify({ schemaVersion: 5, rules: incoming })],
+    'rules.json',
+  );
+
+  button('Filters').click();
+  const input = shadow.querySelector('input[type="file"]');
+  Object.defineProperty(input, 'files', { value: [file] });
+  input.dispatchEvent(new page.window.Event('change'));
+  await until(() => !shadow.querySelector('.ask').hidden);
+  assert.match(shadow.querySelector('.ask').textContent, /"No crashes" is already in your list/);
+  assert.ok(button('Overwrite No crashes'));
+
+  button('Keep mine').click();
+  const names = [...shadow.querySelectorAll('.rule-head input')].map((item) => item.value);
+  assert.equal(JSON.stringify(names), '["No crashes","Weather"]');
+  assert.equal(shadow.querySelector('.then select').value, 'blur');
+  assert.match(shadow.querySelector('.status').textContent, /Imported 1 rule/);
+});
+
 test('opening Filters on unreadable saved data warns and keeps the running rules', async (t) => {
-  const page = runOnHome({
-    filters: {
-      schemaVersion: 4,
-      titles: ['crash'],
-      channels: [],
-      applyToSubscribed: { titles: true },
-    },
-  });
+  const page = runOnHome({ filters: crashRule() });
   t.after(() => page.window.close());
   page.window.console.warn = () => {};
   const broken = { schemaVersion: 99 };
   page.values.set('filters', broken);
-  const shadow = page.document.getElementById('ytuw-controls').shadowRoot;
+  const { shadow, button } = controls(page);
 
-  [...shadow.querySelectorAll('button')].find((item) => item.textContent === 'Filters').click();
+  button('Filters').click();
   assert.match(shadow.querySelector('.status').textContent, /could not be loaded/);
   await new Promise((resolve) => setTimeout(resolve, 250)); // longer than one scan delay
   assert.ok(page.crash.classList.contains('ytuw-match'));

@@ -1,6 +1,6 @@
 {
   "name": "youtube-unwatched",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
   "description": "Blur or hide YouTube Home and watch-page suggestions by title, channel or view count. Subscriptions can be exempt.",
   "license": "MIT",
