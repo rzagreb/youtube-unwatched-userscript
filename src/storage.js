@@ -2,6 +2,7 @@
 /** @import { Filters, Mode } from './typedefs.js' */
 import { DEFAULT_MODE, LOG_PREFIX, MODES } from './constants.js';
 import { DEFAULT_SETTINGS, parseSettings } from './filters.js';
+import { migrateSchema4 } from './migrate-schema-4.js';
 
 // Persisted names: renaming them loses every user's saved settings.
 const MODE_KEY = 'mode';
@@ -30,7 +31,11 @@ export function loadFilters() {
     return { filters, warning: '' };
   }
   try {
-    return { filters: parseSettings(saved), warning: '' };
+    // 1.0.0 settings: converted once, then saved. Remove with migrate-schema-4.js.
+    const current = migrateSchema4(saved, GM_getValue(MODE_KEY, null));
+    const filters = parseSettings(current);
+    if (current !== saved) GM_setValue(FILTERS_KEY, filters.settings);
+    return { filters, warning: '' };
   } catch (error) {
     const warning = `Saved filters could not be loaded. Your existing data has not been replaced. ${error.message}`;
     console.warn(LOG_PREFIX, warning);

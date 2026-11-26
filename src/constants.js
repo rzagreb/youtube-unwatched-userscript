@@ -1,8 +1,8 @@
 // Values shared by several modules. Selectors live in cards.js, storage keys in storage.js.
 
 /** @type {import('./typedefs.js').Mode[]} Button order. */
-export const MODES = ['blur', 'hide', 'off'];
-export const DEFAULT_MODE = 'blur';
+export const MODES = ['on', 'off'];
+export const DEFAULT_MODE = 'on';
 
 /** Preview a blurred card on hover or focus. Click Reveal always works. */
 export const REVEAL_ON_HOVER = false;

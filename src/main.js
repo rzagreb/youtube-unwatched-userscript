@@ -2,7 +2,7 @@
 import { FEED_SELECTOR, findCards, isFeedPage, readCard } from './cards.js';
 import { UI_ATTRIBUTE } from './constants.js';
 import { createEditor } from './editor.js';
-import { matchesFilters, needsSubscriptions } from './filters.js';
+import { actionFor, needsSubscriptions } from './filters.js';
 import { createMarks, PAGE_CSS, showMode } from './marks.js';
 import { createPanel, guardKeyboard, HOST_ID } from './panel.js';
 import { loadFilters, loadMode, saveFilters, saveMode } from './storage.js';
@@ -86,9 +86,10 @@ async function start() {
       const video = readCard(card);
       if (!video) continue;
       const subscribed = video.subscribedButton || subscriptions.isSubscribed(video.channelKeys);
-      if (!matchesFilters(filters, video, subscribed)) continue;
+      const action = actionFor(filters, video, subscribed);
+      if (!action) continue;
       matched.add(card);
-      marks.mark(card, video.fingerprint);
+      marks.mark(card, video.fingerprint, action);
     }
     marks.keepOnly(matched);
     render();

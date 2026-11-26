@@ -11,6 +11,11 @@ function fakeStorage(entries = {}) {
   return values;
 }
 
+const rules = (...conditions) => ({
+  schemaVersion: 5,
+  rules: [{ name: 'Test', conditions, action: 'blur' }],
+});
+
 test('first run saves the default filters', () => {
   const values = fakeStorage();
   const { filters, warning } = loadFilters();
@@ -21,21 +26,23 @@ test('first run saves the default filters', () => {
 
 test('unreadable saved filters are reported and left untouched', (t) => {
   t.mock.method(console, 'warn', () => {});
-  const broken = { schemaVersion: 4, titles: ['('], channels: [] };
+  const broken = rules({ type: 'titleContains', value: '/(/' });
   const values = fakeStorage({ filters: broken });
   const { filters, warning } = loadFilters();
-  assert.match(warning, /has not been replaced.*Titles, rule 1/);
+  assert.match(warning, /has not been replaced.*Rule "Test", condition 1/);
   assert.equal(values.get('filters'), broken);
   assert.deepEqual(filters.settings, DEFAULT_SETTINGS);
 });
 
 test('saveFilters writes nothing when any setting is invalid', () => {
   const values = fakeStorage({ filters: DEFAULT_SETTINGS });
-  assert.throws(() => saveFilters({ ...DEFAULT_SETTINGS, titles: ['ok'], minViews: 'lots' }));
+  assert.throws(() => saveFilters(rules({ type: 'viewsBelow', value: 'lots' })));
   assert.equal(values.get('filters'), DEFAULT_SETTINGS);
 });
 
-test('an unknown saved mode falls back to blur', () => {
-  fakeStorage({ mode: 'sparkle' });
-  assert.equal(loadMode(), 'blur');
+test('an unknown saved mode, like the old blur, falls back to on', () => {
+  fakeStorage({ mode: 'blur' });
+  assert.equal(loadMode(), 'on');
+  fakeStorage({ mode: 'off' });
+  assert.equal(loadMode(), 'off');
 });

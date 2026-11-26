@@ -1,27 +1,43 @@
 // Data model shared across modules. JSDoc only, nothing here runs.
 
-/** @typedef {'blur' | 'hide' | 'off'} Mode */
+/** @typedef {'on' | 'off'} Mode */
 
-/** @typedef {'titles' | 'channels' | 'minViews' | 'maxViews' | 'missingViews'} FilterName */
+/** @typedef {'blur' | 'hide'} Action */
 
 /**
- * Saved filters: the storage value and the JSON backup format.
- * @typedef {object} Settings
- * @property {4} schemaVersion
- * @property {string[]} titles
- * @property {string[]} channels
- * @property {number | null} minViews
- * @property {number | null} maxViews
- * @property {boolean} allowUnknownViews
- * @property {Record<FilterName, boolean>} applyToSubscribed
+ * @typedef {'titleContains' | 'titleDoesNotContain' | 'channelContains' | 'channelDoesNotContain'
+ *   | 'viewsBelow' | 'viewsAbove' | 'viewsMissing' | 'subscribed' | 'notSubscribed'} ConditionType
  */
 
 /**
- * Settings with their patterns compiled.
+ * Text for title and channel types, a count for view limits, else null.
+ * @typedef {object} Condition
+ * @property {ConditionType} type
+ * @property {string | number | null} value
+ */
+
+/**
+ * When every condition matches, the action applies.
+ * @typedef {object} Rule
+ * @property {string} name
+ * @property {Condition[]} conditions
+ * @property {Action} action
+ */
+
+/**
+ * Saved rules: the storage value and the export file format.
+ * @typedef {object} Settings
+ * @property {5} schemaVersion
+ * @property {Rule[]} rules
+ */
+
+/** @typedef {(video: Video, subscribed: boolean | null) => boolean} ConditionTest */
+
+/**
+ * Settings with each rule's conditions built into tests.
  * @typedef {object} Filters
  * @property {Settings} settings
- * @property {RegExp[]} titlePatterns
- * @property {RegExp[]} channelPatterns
+ * @property {{ action: Action, tests: ConditionTest[] }[]} rules
  */
 
 /**

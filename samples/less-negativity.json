@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 5,
+  "rules": [
+    {
+      "name": "Less negativity",
+      "conditions": [
+        {
+          "type": "titleContains",
+          "value": "/\\b(?:wtf is happening|fall of|death of|why.*died|failure|hate|destroy|so expensive|stupid|unemployable|scare|worse|worst|ruining|dying|recession)/i"
+        }
+      ],
+      "action": "hide"
+    }
+  ]
+}
